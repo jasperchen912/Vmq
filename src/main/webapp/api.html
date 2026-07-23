@@ -364,6 +364,18 @@
 
         </div>
     </div>
+
+    <div class="layui-colla-item">
+        <h2 class="layui-colla-title">按商户订单号查询订单</h2>
+        <div class="layui-colla-content layui-show">
+            <blockquote class="layui-elem-quote news_search">
+                <p>请求地址：http://localhost:8080/getOrderByPayId</p>
+                <p>请求方式：POST/GET</p>
+                <p>参数：payId=商户订单号&amp;sign=md5(payId+通讯密钥)</p>
+                <p>返回数据与“查询订单信息”一致。该接口用于创建订单响应丢失后的幂等恢复。</p>
+            </blockquote>
+        </div>
+    </div>
     <div class="layui-colla-item">
         <h2 class="layui-colla-title">查询订单状态</h2>
         <div class="layui-colla-content">
