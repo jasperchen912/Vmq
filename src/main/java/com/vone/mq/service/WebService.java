@@ -259,6 +259,23 @@ public class WebService {
             return ResUtil.error("云端订单编号不存在");
         }
 
+        return orderResult(payOrder);
+    }
+
+    public CommonRes getOrderByPayId(String payId, String sign){
+        String key = settingDao.findById("key").get().getVvalue();
+        String jsSign = md5(payId + key);
+        if (!jsSign.equals(sign)){
+            return ResUtil.error("签名校验不通过");
+        }
+        PayOrder payOrder = payOrderDao.findByPayId(payId);
+        if (payOrder==null){
+            return ResUtil.error("商户订单号不存在");
+        }
+        return orderResult(payOrder);
+    }
+
+    private CommonRes orderResult(PayOrder payOrder) {
         String timeOut = settingDao.findById("close").get().getVvalue();
         CreateOrderRes createOrderRes = new CreateOrderRes(
                 payOrder.getPayId(),payOrder.getOrderId(),payOrder.getType(),payOrder.getPrice(),payOrder.getReallyPrice()

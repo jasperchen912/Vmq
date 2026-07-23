@@ -196,6 +196,22 @@ public class WebController {
         return webService.getOrder(orderId);
     }
 
+    /**
+     * 按商户订单号查询订单。
+     *
+     * 用于调用方在创建订单响应丢失时，使用幂等的商户订单号恢复云端订单。
+     */
+    @RequestMapping("/getOrderByPayId")
+    public CommonRes getOrderByPayId(String payId, String sign) {
+        if (payId == null || payId.equals("")) {
+            return ResUtil.error("请传入商户订单号");
+        }
+        if (sign == null || sign.equals("")) {
+            return ResUtil.error("请传入签名");
+        }
+        return webService.getOrderByPayId(payId, sign);
+    }
+
     @RequestMapping("/checkOrder")
     public CommonRes checkOrder(String orderId) {
         if (orderId == null) {
