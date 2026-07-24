@@ -1,5 +1,6 @@
 package com.vone.mq.entity;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -39,8 +40,10 @@ public class PayOrder {
     private double reallyPrice;
 
     //异步地址
+    @Column(length = 2048)
     private String notifyUrl;
     //支付完成后跳转地址
+    @Column(length = 2048)
     private String returnUrl;
 
     //订单状态  -1：订单过期 0：等待支付 1：支付成功
