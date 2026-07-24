@@ -11,45 +11,49 @@ import com.vone.mq.dto.CommonRes;
 import com.vone.mq.dto.CreateOrderRes;
 import com.vone.mq.service.WebService;
 import com.vone.mq.utils.ResUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletResponse;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Base64;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 @RestController
 public class WebController {
 
-    @Autowired
-    private WebService webService;
+    private static final Logger LOGGER = LoggerFactory.getLogger(WebController.class);
 
-    @RequestMapping("/enQrcode")
+    private final WebService webService;
+
+    public WebController(WebService webService) {
+        this.webService = webService;
+    }
+
+    @RequestMapping(value = "/enQrcode", produces = "image/png")
     public void enQrcode(HttpServletResponse resp, String url) throws IOException {
         if (url != null && !"".equals(url)) {
-            ServletOutputStream stream = null;
-            try {
+            resp.setContentType("image/png");
+            try (ServletOutputStream stream = resp.getOutputStream()) {
                 int width = 200;//图片的宽度
                 int height = 200;//高度
-                stream = resp.getOutputStream();
                 QRCodeWriter writer = new QRCodeWriter();
                 BitMatrix m = writer.encode(url, BarcodeFormat.QR_CODE, height, width);
                 MatrixToImageWriter.writeToStream(m, "png", stream);
             } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                if (stream != null) {
-                    stream.flush();
-                    stream.close();
+                LOGGER.warn("Failed to generate QR code ({})",
+                        e.getClass().getSimpleName());
+                if (!resp.isCommitted()) {
+                    resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 }
             }
         }
@@ -64,15 +68,16 @@ public class WebController {
                 ByteArrayInputStream bais = new ByteArrayInputStream(bytes1);
                 BufferedImage image = ImageIO.read(bais);
                 //定义二维码参数
-                Map hints = new HashMap();
-                hints.put(EncodeHintType.CHARACTER_SET, "utf-8");
+                Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+                hints.put(DecodeHintType.CHARACTER_SET, "utf-8");
                 //获取读取二维码结果
                 BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
                 Result result = multiFormatReader.decode(binaryBitmap, hints);
                 //stream.print(result.getText());
                 return ResUtil.success(result.getText());
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.debug("Failed to decode base64 QR code ({})",
+                        e.getClass().getSimpleName());
             }
         }
         return ResUtil.error();
@@ -80,24 +85,24 @@ public class WebController {
 
     @RequestMapping("/deQrcode2")
     public CommonRes deQrcode2(@RequestParam("file") MultipartFile file) {
-        if (file != null) {
+        if (file != null && !file.isEmpty()) {
             try {
                 MultiFormatReader multiFormatReader = new MultiFormatReader();
                 byte[] bytes1 = file.getBytes();
                 ByteArrayInputStream bais = new ByteArrayInputStream(bytes1);
                 BufferedImage image = ImageIO.read(bais);
                 //定义二维码参数
-                Map hints = new HashMap();
-                hints.put(EncodeHintType.CHARACTER_SET, "utf-8");
+                Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+                hints.put(DecodeHintType.CHARACTER_SET, "utf-8");
                 //获取读取二维码结果
                 BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
                 Result result = multiFormatReader.decode(binaryBitmap, hints);
 
                 //stream.print(result.getText());
-                System.out.println(result.getText());
                 return ResUtil.success(result.getText());
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.debug("Failed to decode uploaded QR code ({})",
+                        e.getClass().getSimpleName());
             }
         }
         return ResUtil.error();

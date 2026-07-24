@@ -19,16 +19,15 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <title>扫码支付</title>
-    <link href="pay.css" rel="stylesheet" media="screen">
-    <script src="https://lib.baomitu.com/jquery/3.3.1/jquery.min.js"></script>
+    <link href="pay.css?v=20260724" rel="stylesheet" media="screen">
 </head>
 
 <body>
 <div class="body" id="body">
     <h1 class="mod-title">
 
-        <span class="ico_log ico-1" v-if="payType == 1"></span>
-        <span class="ico_log ico-2" v-if="payType == 2"></span>
+        <span class="ico_log ico-1" id="wechatLogo" style="display:none"></span>
+        <span class="ico_log ico-2" id="alipayLogo" style="display:none"></span>
 
     </h1>
 
@@ -37,12 +36,12 @@
         </div>
         <div class="amount" id="timeOut" style="font-size: 20px;color: red;display: none;"><p>订单已过期，请您返回网站重新发起支付</p><br></div>
         <div id="orderbody">
-            <div class="amount" id="money">￥{{ reallyPrice }}</div>
+            <div class="amount" id="money"></div>
             <div class="qrcode-img-wrapper" data-role="qrPayImgWrapper">
                 <div data-role="qrPayImg" class="qrcode-img-area">
                     <div class="ui-loading qrcode-loading" data-role="qrPayImgLoading" style="display: none;">加载中</div>
                     <div style="position: relative;display: inline-block;">
-                        <img  id='show_qrcode' alt="加载中..." :src="'/enQrcode?url='+payUrl" width="210" height="210" style="display: block;">
+                        <img id="show_qrcode" alt="加载中..." width="210" height="210" style="display: block;">
                         <!--<img onclick="$('#use').hide()" id="use" src="use_1.png" v-if="payType==1"
                              style="position: absolute;top: 50%;left: 50%;width:32px;height:32px;margin-left: -16px;margin-top: -16px">
                         <img onclick="$('#use').hide()" id="use" src="use_2.png" v-if="payType==2"
@@ -56,10 +55,8 @@
 
 
                 <div class="time-item" id="msg">
-                    <h1  v-if="price != reallyPrice">
-                        <span style="color:red">为了您正常支付 请务必付款 {{ reallyPrice }} 元 <br>备注说明无需填写</span><br>
-
-
+                    <h1 id="priceNotice" style="display:none">
+                        <span style="color:red">为了您正常支付 请务必付款 <span id="noticePrice"></span> 元 <br>备注说明无需填写</span><br>
                     </h1>
 
                 </div>
@@ -78,10 +75,10 @@
             <div class="tip">
                 <div class="ico-scan"></div>
                 <div class="tip-text">
-                    <p>请使用{{payType1}}扫一扫</p>
+                    <p>请使用<span class="payTypeName"></span>扫一扫</p>
 
-                    <p v-if="isAuto == 0">扫描二维码完成支付</p>
-                    <p v-if="isAuto == 1">扫码后输入金额支付</p>
+                    <p id="fixedQrTip" style="display:none">扫描二维码完成支付</p>
+                    <p id="autoQrTip" style="display:none">扫码后输入金额支付</p>
 
                 </div>
             </div>
@@ -89,11 +86,11 @@
             <div class="detail" id="orderDetail">
                 <dl class="detail-ct" id="desc" style="display: none;">
                     <dt>金额</dt>
-                    <dd>{{price}}</dd>
+                    <dd id="detailPrice"></dd>
                     <dt>商户订单：</dt>
-                    <dd>{{payId}}</dd>
+                    <dd id="detailPayId"></dd>
                     <dt>创建时间：</dt>
-                    <dd>{{formatDate(date)}}</dd>
+                    <dd id="detailDate"></dd>
                     <dt>状态</dt>
                     <dd>等待支付</dd>
                 </dl>
@@ -112,7 +109,7 @@
     <div class="foot">
         <div class="inner">
             <p>手机用户可保存上方二维码到手机中</p>
-            <p>在{{payType1}}扫一扫中选择“相册”即可</p>
+            <p>在<span class="payTypeName"></span>扫一扫中选择“相册”即可</p>
         </div>
     </div>
 
@@ -121,21 +118,14 @@
 
 </div>
 
-<script src="https://lib.baomitu.com/vue/2.5.21/vue.min.js"></script>
-
 <script>
-
-    function aaa() {
-        if ($('#orderDetail').hasClass('detail-open')) {
-            $('#orderDetail .detail-ct').slideUp(500, function () {
-                $('#orderDetail').removeClass('detail-open');
-            });
-        } else {
-            $('#orderDetail .detail-ct').slideDown(500, function () {
-                $('#orderDetail').addClass('detail-open');
-            });
-        }
+    window.aaa = function () {
+        var orderDetail = document.getElementById('orderDetail');
+        var detail = orderDetail.querySelector('.detail-ct');
+        var open = orderDetail.classList.toggle('detail-open');
+        detail.style.display = open ? 'block' : 'none';
     }
+
     function formatDate(now) {
         now = new Date(now)
         return now.getFullYear()
@@ -147,114 +137,92 @@
 
     }
     var myTimer;
-    function timer(intDiff) {
-        var i = 0;
-        i++;
-        var day = 0,
-            hour = 0,
-            minute = 0,
-            second = 0;//时间默认值
-        if (intDiff > 0) {
-            day = Math.floor(intDiff / (60 * 60 * 24));
-            hour = Math.floor(intDiff / (60 * 60)) - (day * 24);
-            minute = Math.floor(intDiff / 60) - (day * 24 * 60) - (hour * 60);
-            second = Math.floor(intDiff) - (day * 24 * 60 * 60) - (hour * 60 * 60) - (minute * 60);
-        }
-        if (minute <= 9) minute = '0' + minute;
-        if (second <= 9) second = '0' + second;
-        $('#hour_show').html('<s id="h"></s>' + hour + '时');
-        $('#minute_show').html('<s></s>' + minute + '分');
-        $('#second_show').html('<s></s>' + second + '秒');
-        if (hour <= 0 && minute <= 0 && second <= 0) {
-            qrcode_timeout()
-            clearInterval(myTimer);
-
-        }
-        intDiff--;
-
-        myTimer = window.setInterval(function () {
-            i++;
-            var day = 0,
-                hour = 0,
-                minute = 0,
-                second = 0;//时间默认值
-            if (intDiff > 0) {
-                day = Math.floor(intDiff / (60 * 60 * 24));
-                hour = Math.floor(intDiff / (60 * 60)) - (day * 24);
-                minute = Math.floor(intDiff / 60) - (day * 24 * 60) - (hour * 60);
-                second = Math.floor(intDiff) - (day * 24 * 60 * 60) - (hour * 60 * 60) - (minute * 60);
+    function timer(secondsRemaining) {
+        var deadline = Date.now() + Math.max(0, secondsRemaining) * 1000;
+        function render() {
+            var totalSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+            var hour = Math.floor(totalSeconds / 3600);
+            var minute = Math.floor((totalSeconds % 3600) / 60);
+            var second = totalSeconds % 60;
+            document.getElementById('hour_show').textContent = hour + '时';
+            document.getElementById('minute_show').textContent = String(minute).padStart(2, '0') + '分';
+            document.getElementById('second_show').textContent = String(second).padStart(2, '0') + '秒';
+            if (totalSeconds === 0) {
+                qrcode_timeout();
+                window.clearInterval(myTimer);
             }
-            if (minute <= 9) minute = '0' + minute;
-            if (second <= 9) second = '0' + second;
-            $('#hour_show').html('<s id="h"></s>' + hour + '时');
-            $('#minute_show').html('<s></s>' + minute + '分');
-            $('#second_show').html('<s></s>' + second + '秒');
-            if (hour <= 0 && minute <= 0 && second <= 0) {
-                qrcode_timeout()
-                clearInterval(myTimer);
-
-            }
-            intDiff--;
-        }, 1000);
+        }
+        render();
+        myTimer = window.setInterval(render, 1000);
     }
-
-
 
     function qrcode_timeout(){
         document.getElementById("orderbody").style.display = "none";
         document.getElementById("timeOut").style.display = "";
     }
 
-
-    function getQueryString(name) {
-        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
-        var r = window.location.search.substr(1).match(reg);
-        if (r != null)
-            return decodeURI(r[2]);
-        return null;
+    function post(path, values) {
+        return fetch(path, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+            body: new URLSearchParams(values).toString(),
+            credentials: 'same-origin'
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.json();
+        });
     }
 
-    $.post("/getOrder","orderId="+getQueryString("orderId"),function (data) {
-        if (data.code==1){
-            var time = new Date().getTime()-data.data.date;
-            time = time/1000;
-            time = data.data.timeOut*60 - time;
-            if (data.data.state == -1){
-                time = 0;
-            }
-            timer(time);
-            
-            if (data.data.payType == 1) {
-                data.data.payType1 = "微信";
-            }else if (data.data.payType == 2) {
-                data.data.payType1 = "支付宝";
-            }
-
-
-            new Vue({
-                el: '#body',
-                data: data.data
-            })
-
-            check();
-        }else{
-            timer(0)
+    function renderOrder(order) {
+        var typeName = order.payType === 1 ? '微信' : '支付宝';
+        document.getElementById(order.payType === 1 ? 'wechatLogo' : 'alipayLogo').style.display = '';
+        document.getElementById('money').textContent = '￥' + order.reallyPrice;
+        document.getElementById('show_qrcode').src = '/enQrcode?url=' + encodeURIComponent(order.payUrl);
+        document.getElementById('fixedQrTip').style.display = order.isAuto === 0 ? '' : 'none';
+        document.getElementById('autoQrTip').style.display = order.isAuto === 1 ? '' : 'none';
+        document.getElementById('detailPrice').textContent = order.price;
+        document.getElementById('detailPayId').textContent = order.payId;
+        document.getElementById('detailDate').textContent = formatDate(order.date);
+        Array.prototype.forEach.call(document.querySelectorAll('.payTypeName'), function (element) {
+            element.textContent = typeName;
+        });
+        if (Number(order.price) !== Number(order.reallyPrice)) {
+            document.getElementById('noticePrice').textContent = order.reallyPrice;
+            document.getElementById('priceNotice').style.display = '';
         }
+    }
+
+    var orderId = new URLSearchParams(window.location.search).get('orderId');
+    post('/getOrder', {orderId: orderId || ''}).then(function (data) {
+        if (data.code !== 1) {
+            timer(0);
+            return;
+        }
+        var order = data.data;
+        renderOrder(order);
+        var elapsed = (Date.now() - order.date) / 1000;
+        var remaining = order.state === -1 ? 0 : order.timeOut * 60 - elapsed;
+        timer(remaining);
+        check();
+    }).catch(function () {
+        timer(0);
     });
 
     function check() {
-        $.post("/checkOrder","orderId="+getQueryString("orderId"),function (data) {
-            console.log(data);
+        post('/checkOrder', {orderId: orderId || ''}).then(function (data) {
             if (data.code == 1){
                 window.location.href = data.data;
-            } else{
-                if (data.data == "订单已过期") {
-                    intDiff = 0;
-                }else{
-                    setTimeout("check()",1500);
-                }
+            } else if (data.data === '订单已过期') {
+                qrcode_timeout();
+                window.clearInterval(myTimer);
+            } else {
+                window.setTimeout(check, 1500);
             }
-        })
+        }).catch(function () {
+            window.setTimeout(check, 3000);
+        });
     }
 
 </script>

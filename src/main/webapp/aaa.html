@@ -10,8 +10,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="format-detection" content="telephone=no">
 
-    <link rel="stylesheet" href="layui/css/layui.css"  media="all">
-    <link rel="stylesheet" href="css/global.css?t=1531663423583-6" media="all">
+    <link rel="stylesheet" href="layui/css/layui.css?v=20260724" media="all">
+    <link rel="stylesheet" href="css/global.css?v=20260724" media="all">
     <style type="text/css">ins.adsbygoogle{display:none!important;display:none}</style></head>
 <body>
 <div class="layui-layout layui-layout-admin">
@@ -26,18 +26,13 @@
                         管理员
                     </a>
                     <dl class="layui-nav-child">
-                        <dd><a href="index.html">退出</a></dd>
+                        <dd><a href="javascript:;" id="logout">退出</a></dd>
                     </dl>
                 </li>
                 <!-- <li class="layui-nav-item"><a href="">退出</a></li> -->
             </ul>
         </div>
     </div>
-    <!-- 让IE8/9支持媒体查询，从而兼容栅格 -->
-    <!--[if lt IE 9]>
-    <script src="https://cdn.staticfile.org/html5shiv/r29/html5.min.js"></script>
-    <script src="https://cdn.staticfile.org/respond.js/1.4.2/respond.min.js"></script>
-    <![endif]-->
     <div class="layui-side layui-bg-black">
         <div class="layui-side-scroll">
 
@@ -74,27 +69,14 @@
         <i class="layui-icon">&#xe602;</i>
     </div>
     <div class="site-mobile-shade"></div>
-    <script src="layui/layui.js?t=1531663423583" charset="utf-8"></script>
-    <script>
-        window.global = {
-            pageType: 'demo'
-            ,preview: function(){
-                var preview = document.getElementById('LAY_preview');
-                return preview ? preview.innerHTML : '';
-            }()
-        };
-        layui.config({
-            base: 'js/'
-            ,version: '1531663423583'
-        }).use('global');
-    </script>
+    <script src="layui/layui.all.js?v=20260724" charset="utf-8"></script>
 </div>
 <script>
-
-
-    layui.use(['layer','element'], function(){
-        var $ = layui.$
-            ,setIframe = function(){
+    layui.use(['jquery', 'layer', 'element'], function(){
+        window.jQuery = window.$ = layui.$;
+        var $ = window.$;
+        var element = layui.element;
+        var setIframe = function(){
             var height = $(window).height() - 370;
             $('#demoAdmin').height(height);
         };
@@ -102,50 +84,53 @@
         setIframe();
         $(window).on('resize', setIframe);
 
+        function pageLink(item) {
+            var link = $('<a href="javascript:;"></a>').text(item.name);
+            link.on('click', function () {
+                $('#LAY_preview').load(item.url);
+            });
+            return link;
+        }
 
+        function renderMenu(data) {
+            var menu = $('#v_menu').empty();
+            data.forEach(function (item) {
+                var row = $('<li class="layui-nav-item"></li>');
+                if (item.type === 'menu') {
+                    row.addClass('layui-nav-itemed');
+                    row.append($('<a href="javascript:;"></a>').text(item.name));
+                    var children = $('<dl class="layui-nav-child"></dl>');
+                    item.node.forEach(function (child) {
+                        children.append($('<dd></dd>').append(pageLink(child)));
+                    });
+                    row.append(children);
+                } else {
+                    row.append(pageLink(item));
+                }
+                menu.append(row);
+            });
+            element.render('nav');
+        }
 
+        $('#LAY_preview').load('main.html?v=20260724');
+        $.post('/admin/getMenu')
+            .done(function (data) {
+                if (!data || !data.length) {
+                    window.location.href = '/';
+                    return;
+                }
+                renderMenu(data);
+            })
+            .fail(function () {
+                window.location.href = '/';
+            });
+
+        $('#logout').on('click', function () {
+            $.post('/logout').always(function () {
+                window.location.href = '/';
+            });
+        });
     });
 </script>
-<script src="https://lib.baomitu.com/jquery/3.3.1/jquery.min.js"></script>
-<script type="text/javascript" src="https://unpkg.com/wangeditor@3.1.1/release/wangEditor.min.js"></script>
-<script type="text/javascript">
-
-
-$("#LAY_preview").load("main.html")
-
-$.post("/admin/getMenu",function (data) {
-    if (data == null || data == "") {
-        window.location.href = "/";
-    }
-    console.log(data);
-    var out_menu = "";
-    for (var i = 0;i<data.length;i++){
-        if (data[i].type=="menu"){
-            out_menu+='<li class="layui-nav-item layui-nav-itemed">';
-            out_menu+='<a class="" href="javascript:;">'+data[i].name+'</a>';
-            out_menu+='<dl class="layui-nav-child">';
-
-            for (var ii = 0;ii<data[i].node.length;ii++){
-                out_menu+='<dd><a onclick="$(\'#LAY_preview\').load(\''+data[i].node[ii].url+'\');">'+data[i].node[ii].name+'</a></dd>';
-            }
-            out_menu+='</dl>';
-            out_menu+='</li>';
-        } else{
-            out_menu+='<li class="layui-nav-item"><a onclick="$(\'#LAY_preview\').load(\''+data[i].url+'\');">'+data[i].name+'</a></li>';
-        }
-    }
-    console.log(out_menu);
-    $("#v_menu").append(out_menu);
-    if (layui.element)
-        layui.element.render();
-
-
-});
-</script>
-
-
-
-
-
 </body>
 </html>

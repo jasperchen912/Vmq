@@ -12,25 +12,33 @@ import com.vone.mq.entity.Setting;
 import com.vone.mq.utils.Arith;
 import com.vone.mq.utils.HttpRequest;
 import com.vone.mq.utils.ResUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
 public class WebService {
-    @Autowired
-    private SettingDao settingDao;
-    @Autowired
-    private PayOrderDao payOrderDao;
-    @Autowired
-    private TmpPriceDao tmpPriceDao;
-    @Autowired
-    private PayQrcodeDao payQrcodeDao;
+    private final SettingDao settingDao;
+    private final PayOrderDao payOrderDao;
+    private final TmpPriceDao tmpPriceDao;
+    private final PayQrcodeDao payQrcodeDao;
+
+    public WebService(
+            SettingDao settingDao,
+            PayOrderDao payOrderDao,
+            TmpPriceDao tmpPriceDao,
+            PayQrcodeDao payQrcodeDao) {
+        this.settingDao = settingDao;
+        this.payOrderDao = payOrderDao;
+        this.tmpPriceDao = tmpPriceDao;
+        this.payQrcodeDao = payQrcodeDao;
+    }
 
     public CommonRes createOrder(String payId, String param, Integer type, String price, String notifyUrl, String returnUrl, String sign){
         String key = settingDao.findById("key").get().getVvalue();
@@ -83,7 +91,7 @@ public class WebService {
             payUrl = settingDao.findById("zfbpay").get().getVvalue();
         }
 
-        if (payUrl==""){
+        if (payUrl.isEmpty()){
             return ResUtil.error("请您先进入后台配置程序");
         }
 
@@ -228,9 +236,8 @@ public class WebService {
             payOrderDao.save(payOrder);
 
             //执行通知
-            String p = "payId="+payOrder.getPayId()+"&param="+payOrder.getParam()+"&type="+payOrder.getType()+"&price="+payOrder.getPrice()+"&reallyPrice="+payOrder.getReallyPrice();
             sign = md5(payOrder.getPayId()+payOrder.getParam()+payOrder.getType()+payOrder.getPrice()+payOrder.getReallyPrice()+key);
-            p = p+"&sign="+sign;
+            String p = callbackParameters(payOrder, sign);
             String url = payOrder.getNotifyUrl();
             if (url==null || url.equals("")){
                 url = settingDao.findById("notifyUrl").get().getVvalue();
@@ -299,15 +306,15 @@ public class WebService {
         }
         String key = settingDao.findById("key").get().getVvalue();
         //执行通知
-        String p = "payId="+payOrder.getPayId()+"&param="+payOrder.getParam()+"&type="+payOrder.getType()+"&price="+payOrder.getPrice()+"&reallyPrice="+payOrder.getReallyPrice();
         String sign = md5(payOrder.getPayId()+payOrder.getParam()+payOrder.getType()+payOrder.getPrice()+payOrder.getReallyPrice()+key);
-        p = p+"&sign="+sign;
+        String p = callbackParameters(payOrder, sign);
         String url = payOrder.getReturnUrl();
         if (url==null){
             url = settingDao.findById("returnUrl").get().getVvalue();
         }
 
-        return ResUtil.success(url+"?"+p);
+        String separator = url.contains("?") ? "&" : "?";
+        return ResUtil.success(url + separator + p);
     }
 
     public CommonRes getState(String t,String sign){
@@ -331,7 +338,19 @@ public class WebService {
 
     public static String md5(String text) {
         //加密后的字符串
-        String encodeStr= DigestUtils.md5DigestAsHex(text.getBytes());
+        String encodeStr= DigestUtils.md5DigestAsHex(
+                text.getBytes(StandardCharsets.UTF_8));
         return encodeStr;
+    }
+
+    private String callbackParameters(PayOrder order, String sign) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("payId", order.getPayId());
+        values.put("param", order.getParam());
+        values.put("type", order.getType());
+        values.put("price", order.getPrice());
+        values.put("reallyPrice", order.getReallyPrice());
+        values.put("sign", sign);
+        return HttpRequest.formEncode(values);
     }
 }

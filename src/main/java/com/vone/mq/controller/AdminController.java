@@ -5,20 +5,27 @@ import com.vone.mq.dto.PageRes;
 import com.vone.mq.entity.PayQrcode;
 import com.vone.mq.service.AdminService;
 import com.vone.mq.utils.ResUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpSession;
 import java.util.*;
 
 @RestController
 public class AdminController {
-    @Autowired
-    private AdminService adminService;
+    private static final String LOGIN_SESSION_KEY = "login";
+    private static final String ASSET_VERSION = "20260724";
 
-    @RequestMapping("/login")
-    public CommonRes login(HttpSession session,String user, String pass){
+    private final AdminService adminService;
+
+    public AdminController(AdminService adminService) {
+        this.adminService = adminService;
+    }
+
+    @PostMapping("/login")
+    public CommonRes login(HttpServletRequest request, String user, String pass){
         if (user==null){
             return ResUtil.error("请输入账号");
         }
@@ -27,27 +34,38 @@ public class AdminController {
         }
         CommonRes r = adminService.login(user, pass);
         if (r.getCode()==1){
-            session.setAttribute("login","1");
+            request.getSession(true);
+            request.changeSessionId();
+            request.getSession(false).setAttribute(LOGIN_SESSION_KEY, "1");
         }
         return r;
     }
 
+    @PostMapping("/logout")
+    public CommonRes logout(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ResUtil.success();
+    }
+
     @RequestMapping("/admin/getMenu")
     public List<Map<String,Object>> getMenu(HttpSession session){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return null;
         }
         List<Map<String,Object>> menu = new ArrayList<>();
         Map<String,Object> node = new HashMap<>();
         node.put("name","系统设置");
         node.put("type","url");
-        node.put("url","admin/setting.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/setting.html"));
         menu.add(node);
 
         node = new HashMap<>();
         node.put("name","监控端设置");
         node.put("type","url");
-        node.put("url","admin/jk.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/jk.html"));
         menu.add(node);
 
 
@@ -56,13 +74,13 @@ public class AdminController {
         node = new HashMap<>();
         node.put("name","添加");
         node.put("type","url");
-        node.put("url","admin/addwxqrcode.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/addwxqrcode.html"));
         menu1.add(node);
 
         node = new HashMap<>();
         node.put("name","管理");
         node.put("type","url");
-        node.put("url","admin/wxqrcodelist.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/wxqrcodelist.html"));
         menu1.add(node);
 
         node = new HashMap<>();
@@ -77,13 +95,13 @@ public class AdminController {
         node = new HashMap<>();
         node.put("name","添加");
         node.put("type","url");
-        node.put("url","admin/addzfbqrcode.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/addzfbqrcode.html"));
         menu2.add(node);
 
         node = new HashMap<>();
         node.put("name","管理");
         node.put("type","url");
-        node.put("url","admin/zfbqrcodelist.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/zfbqrcodelist.html"));
         menu2.add(node);
 
         node = new HashMap<>();
@@ -95,33 +113,33 @@ public class AdminController {
         node = new HashMap<>();
         node.put("name","订单列表");
         node.put("type","url");
-        node.put("url","admin/orderlist.html?t="+new Date().getTime());
+        node.put("url",versioned("admin/orderlist.html"));
         menu.add(node);
 
         node = new HashMap<>();
         node.put("name","Api说明");
         node.put("type","url");
-        node.put("url","../api.html?t="+new Date().getTime());
+        node.put("url",versioned("../api.html"));
         menu.add(node);
         return menu;
     }
     @RequestMapping("/admin/saveSetting")
     public CommonRes saveSetting(HttpSession session,String user,String pass,String notifyUrl,String returnUrl,String key,String wxpay,String zfbpay,String close,String payQf){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
         return adminService.saveSetting(user, pass, notifyUrl, returnUrl, key, wxpay, zfbpay, close, payQf);
     }
     @RequestMapping("/admin/getSettings")
     public CommonRes getSettings(HttpSession session){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
         return adminService.getSettings();
     }
     @RequestMapping("/admin/getOrders")
     public PageRes getOrders(HttpSession session,Integer page, Integer limit, Integer type, Integer state){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             PageRes p = new PageRes();
             p.setCode(-1);
             p.setMsg("未登录");
@@ -131,7 +149,7 @@ public class AdminController {
     }
     @RequestMapping("/admin/setBd")
     public CommonRes setBd(HttpSession session,Integer id){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
         if (id==null){
@@ -141,7 +159,7 @@ public class AdminController {
     }
     @RequestMapping("/admin/getPayQrcodes")
     public PageRes getPayQrcodes(HttpSession session,Integer page, Integer limit, Integer type){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             PageRes p = new PageRes();
             p.setCode(-1);
             p.setMsg("未登录");
@@ -151,7 +169,7 @@ public class AdminController {
     }
     @RequestMapping("/admin/delPayQrcode")
     public CommonRes delPayQrcode(HttpSession session,Long id){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
 
@@ -159,14 +177,14 @@ public class AdminController {
     }
     @RequestMapping("/admin/addPayQrcode")
     public CommonRes addPayQrcode(HttpSession session,PayQrcode payQrcode){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
         return adminService.addPayQrcode(payQrcode);
     }
     @RequestMapping("/admin/getMain")
     public CommonRes getMain(HttpSession session){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
         return adminService.getMain();
@@ -174,7 +192,7 @@ public class AdminController {
 
     @RequestMapping("/admin/delOrder")
     public CommonRes delOrder(HttpSession session,Long id){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
 
@@ -183,7 +201,7 @@ public class AdminController {
 
     @RequestMapping("/admin/delGqOrder")
     public CommonRes delGqOrder(HttpSession session){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
 
@@ -191,10 +209,18 @@ public class AdminController {
     }
     @RequestMapping("/admin/delLastOrder")
     public CommonRes delLastOrder(HttpSession session){
-        if (session.getAttribute("login")==null){
+        if (!isLoggedIn(session)){
             return ResUtil.error("未登录");
         }
 
         return adminService.delLastOrder();
+    }
+
+    private boolean isLoggedIn(HttpSession session) {
+        return session != null && session.getAttribute(LOGIN_SESSION_KEY) != null;
+    }
+
+    private String versioned(String path) {
+        return path + "?v=" + ASSET_VERSION;
     }
 }

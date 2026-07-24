@@ -1,22 +1,23 @@
 package com.vone.mq.service;
 
 import com.vone.mq.dao.PayOrderDao;
+import com.vone.mq.dao.PayQrcodeDao;
 import com.vone.mq.dao.SettingDao;
+import com.vone.mq.dao.TmpPriceDao;
 import com.vone.mq.dto.CommonRes;
 import com.vone.mq.dto.CreateOrderRes;
 import com.vone.mq.entity.PayOrder;
 import com.vone.mq.entity.Setting;
-import org.junit.Before;
-import org.junit.Test;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,12 +30,14 @@ public class WebServicePayIdQueryTest {
 
     private final SettingDao settingDao = mock(SettingDao.class);
     private final PayOrderDao payOrderDao = mock(PayOrderDao.class);
-    private final WebService service = new WebService();
+    private final WebService service = new WebService(
+            settingDao,
+            payOrderDao,
+            mock(TmpPriceDao.class),
+            mock(PayQrcodeDao.class));
 
-    @Before
+    @BeforeEach
     public void setUp() {
-        ReflectionTestUtils.setField(service, "settingDao", settingDao);
-        ReflectionTestUtils.setField(service, "payOrderDao", payOrderDao);
         when(settingDao.findById("key")).thenReturn(
                 Optional.of(setting("key", KEY)));
         when(settingDao.findById("close")).thenReturn(

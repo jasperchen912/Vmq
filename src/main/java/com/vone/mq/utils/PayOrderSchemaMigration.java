@@ -22,6 +22,8 @@ public class PayOrderSchemaMigration implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         widenColumnIfNeeded("NOTIFY_URL");
         widenColumnIfNeeded("RETURN_URL");
+        alignEntitySequences();
+        createPerformanceIndexes();
     }
 
     private void widenColumnIfNeeded(String columnName) {
@@ -48,5 +50,66 @@ public class PayOrderSchemaMigration implements ApplicationRunner {
                             + CALLBACK_URL_LENGTH
                             + ")");
         }
+    }
+
+    private void createPerformanceIndexes() {
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_pay_id "
+                        + "ON pay_order(pay_id)");
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_order_id "
+                        + "ON pay_order(order_id)");
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_state_create_date "
+                        + "ON pay_order(state, create_date)");
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_really_state_type "
+                        + "ON pay_order(really_price, state, type)");
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_pay_date "
+                        + "ON pay_order(pay_date)");
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pay_order_type_state_id "
+                        + "ON pay_order(type, state, id)");
+        if (tableExists("PAY_QRCODE")) {
+            jdbcTemplate.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_pay_qrcode_price_type "
+                            + "ON pay_qrcode(price, type)");
+        }
+    }
+
+    private void alignEntitySequences() {
+        alignSequenceAboveExistingIds("PAY_ORDER", "PAY_ORDER_SEQ");
+        if (tableExists("PAY_QRCODE")) {
+            alignSequenceAboveExistingIds("PAY_QRCODE", "PAY_QRCODE_SEQ");
+        }
+    }
+
+    private void alignSequenceAboveExistingIds(String tableName, String sequenceName) {
+        Long nextValue = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) + 1 FROM " + tableName,
+                Long.class);
+        long restartWith = nextValue == null ? 1L : Math.max(1L, nextValue);
+
+        jdbcTemplate.execute(
+                "CREATE SEQUENCE IF NOT EXISTS "
+                        + sequenceName
+                        + " START WITH "
+                        + restartWith
+                        + " INCREMENT BY 50");
+        jdbcTemplate.execute(
+                "ALTER SEQUENCE "
+                        + sequenceName
+                        + " RESTART WITH "
+                        + restartWith);
+    }
+
+    private boolean tableExists(String tableName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                        + "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = ?",
+                Integer.class,
+                tableName);
+        return count != null && count > 0;
     }
 }

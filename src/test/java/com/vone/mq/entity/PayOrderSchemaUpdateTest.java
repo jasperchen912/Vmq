@@ -1,17 +1,19 @@
 package com.vone.mq.entity;
 
 import com.vone.mq.utils.PayOrderSchemaMigration;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import javax.persistence.Column;
+import jakarta.persistence.Column;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class PayOrderSchemaUpdateTest {
 
@@ -33,6 +35,7 @@ public class PayOrderSchemaUpdateTest {
 
         assertColumnLength(databaseUrl, "NOTIFY_URL", CALLBACK_URL_LENGTH);
         assertColumnLength(databaseUrl, "RETURN_URL", CALLBACK_URL_LENGTH);
+        assertIndexesCreated(databaseUrl);
         insertOrderWithLongCallbackUrls(databaseUrl);
     }
 
@@ -48,6 +51,24 @@ public class PayOrderSchemaUpdateTest {
                 PayOrder.class.getDeclaredField("returnUrl")
                         .getAnnotation(Column.class)
                         .length());
+    }
+
+    @Test
+    public void schemaUpdateAlignsHibernateSixSequencesAboveExistingIds() throws Exception {
+        String databaseUrl = "jdbc:h2:mem:pay-order-sequence-update;DB_CLOSE_DELAY=-1";
+        createLegacySchema(databaseUrl);
+        insertLegacyRows(databaseUrl);
+
+        DriverManagerDataSource dataSource =
+                new DriverManagerDataSource(databaseUrl, "sa", "");
+        dataSource.setDriverClassName("org.h2.Driver");
+        PayOrderSchemaMigration migration =
+                new PayOrderSchemaMigration(new JdbcTemplate(dataSource));
+
+        migration.run(null);
+
+        assertNextSequenceValue(databaseUrl, "PAY_ORDER_SEQ", 43L);
+        assertNextSequenceValue(databaseUrl, "PAY_QRCODE_SEQ", 18L);
     }
 
     private void createLegacySchema(String databaseUrl) throws Exception {
@@ -69,6 +90,11 @@ public class PayOrderSchemaUpdateTest {
                     + "state INTEGER NOT NULL,"
                     + "is_auto INTEGER NOT NULL,"
                     + "pay_url VARCHAR(255))");
+            statement.execute("CREATE TABLE pay_qrcode ("
+                    + "id BIGINT PRIMARY KEY,"
+                    + "pay_url VARCHAR(255),"
+                    + "price DOUBLE NOT NULL,"
+                    + "type INTEGER NOT NULL)");
         }
     }
 
@@ -99,6 +125,33 @@ public class PayOrderSchemaUpdateTest {
         }
     }
 
+    private void insertLegacyRows(String databaseUrl) throws Exception {
+        try (Connection connection = DriverManager.getConnection(databaseUrl, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate(
+                    "INSERT INTO pay_order ("
+                            + "id, order_id, pay_id, create_date, pay_date, close_date, param, "
+                            + "type, price, really_price, notify_url, return_url, state, is_auto, "
+                            + "pay_url) VALUES "
+                            + "(42, 'legacy-order', 'legacy-pay', 0, 0, 0, '', "
+                            + "1, 1.0, 1.0, '', '', 0, 1, '')");
+            statement.executeUpdate(
+                    "INSERT INTO pay_qrcode (id, pay_url, price, type) "
+                            + "VALUES (17, 'legacy-qrcode', 1.0, 1)");
+        }
+    }
+
+    private void assertNextSequenceValue(
+            String databaseUrl, String sequenceName, long expectedValue) throws Exception {
+        try (Connection connection = DriverManager.getConnection(databaseUrl, "sa", "");
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT NEXT VALUE FOR " + sequenceName)) {
+            result.next();
+            assertEquals(expectedValue, result.getLong(1));
+        }
+    }
+
     private String repeat(String value, int count) {
         StringBuilder result = new StringBuilder(value.length() * count);
         for (int i = 0; i < count; i++) {
@@ -118,6 +171,28 @@ public class PayOrderSchemaUpdateTest {
                              + "AND COLUMN_NAME = '" + columnName + "'")) {
             result.next();
             assertEquals(expectedLength, result.getInt(1));
+        }
+    }
+
+    private void assertIndexesCreated(String databaseUrl) throws Exception {
+        Set<String> expected = Set.of(
+                "IDX_PAY_ORDER_PAY_ID",
+                "IDX_PAY_ORDER_ORDER_ID",
+                "IDX_PAY_ORDER_STATE_CREATE_DATE",
+                "IDX_PAY_ORDER_REALLY_STATE_TYPE",
+                "IDX_PAY_ORDER_PAY_DATE",
+                "IDX_PAY_ORDER_TYPE_STATE_ID",
+                "IDX_PAY_QRCODE_PRICE_TYPE");
+        try (Connection connection = DriverManager.getConnection(databaseUrl, "sa", "");
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES "
+                             + "WHERE INDEX_NAME LIKE 'IDX_PAY_%'")) {
+            java.util.HashSet<String> names = new java.util.HashSet<>();
+            while (result.next()) {
+                names.add(result.getString(1));
+            }
+            assertTrue(names.containsAll(expected), "Missing indexes: " + expected);
         }
     }
 }

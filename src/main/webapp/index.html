@@ -10,8 +10,8 @@
 	<link rel="shortcut icon" href="/favicon.ico" />
 	<link rel="bookmark" href="/favicon.ico" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-	<link rel="stylesheet" href="/assets/css/main.css" />
-	<noscript><link rel="stylesheet" href="/assets/css/noscript.css" /></noscript>
+	<link rel="stylesheet" href="/assets/css/main.css?v=20260724" />
+	<noscript><link rel="stylesheet" href="/assets/css/noscript.css?v=20260724" /></noscript>
 </head>
 <body>
 <div id="wrapper">
@@ -49,7 +49,7 @@
 
 		<article id="login">
 			<h2 class="major">登录</h2>
-			<form method="post" action="javascript:login();">
+			<form method="post" id="loginForm">
 				<div class="field half first">
 					<label for="user">账号</label>
 					<input type="text" name="user" id="user" />
@@ -80,22 +80,6 @@
 
 <div id="bg"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/jquery@1.11.3"></script>
-<script src="https://cdn.jsdelivr.net/gh/ajlkn/skel@3.0.1/dist/skel.min.js"></script>
-<script src="/assets/js/util.js"></script>
-<script src="/assets/js/main.js"></script>
-<script src="https://lib.baomitu.com/layer/3.1.1/layer.js"></script>
-
-
-<script>
-	function login() {
-		$.post("/login","user="+$("#user").val()+"&pass="+$("#pass").val(),function (data) {
-			layer.msg(data.msg);
-			if (data.code==1){
-				window.location.href = "aaa.html";
-			}
-		});
-	}
-</script>
+<script src="/assets/js/home.js?v=20260724"></script>
 </body>
 </html>
