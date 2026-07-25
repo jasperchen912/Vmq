@@ -19,6 +19,18 @@ public interface PayOrderDao extends JpaRepository<PayOrder, Long>, JpaSpecifica
     @Query(value = "update pay_order set state=?1 where id=?2", nativeQuery = true)
     int setState(int state,long id);
 
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update pay_order
+            set state=2,
+                pay_date=case when pay_date=0 then ?2 else pay_date end,
+                close_date=case when close_date=0 then ?2 else close_date end
+            where id=?1
+              and state in (-1, 0)
+            """, nativeQuery = true)
+    int markManualCallbackPending(long id, long confirmedAt);
+
     List<PayOrder> findAllByStateAndCreateDateLessThan(int state, long createDate);
 
     PayOrder findByReallyPriceAndStateAndType(double reallyPrice,int state,int type);

@@ -160,6 +160,11 @@ public class AdminService {
         if (payOrder==null){
             return ResUtil.error("订单不存在");
         }
+        int initialState = payOrder.getState();
+        if (initialState != -1 && initialState != 0
+                && initialState != 1 && initialState != 2) {
+            return ResUtil.error("订单状态不允许补单");
+        }
         String key = settingDao.findById("key").get().getVvalue();
         String sign = payOrder.getPayId()+payOrder.getParam()+payOrder.getType()+payOrder.getPrice()+payOrder.getReallyPrice()+key;
         Map<String, Object> callbackParameters = new LinkedHashMap<>();
@@ -179,18 +184,33 @@ public class AdminService {
             }
         }
 
-        String res = HttpRequest.sendGet(url,p);
+        if (initialState == -1 || initialState == 0) {
+            int prepared = payOrderDao.markManualCallbackPending(
+                    payOrder.getId(), System.currentTimeMillis());
+            if (prepared != 1) {
+                return ResUtil.error("订单状态已变化，请刷新后重试");
+            }
+            if (initialState == 0) {
+                tmpPriceDao.delprice(
+                        payOrder.getType()+"-"+payOrder.getReallyPrice());
+            }
+        }
+
+        String res = sendCallback(url,p);
 
         if (res!=null && res.equals("success")){
-            if (payOrder.getState()==0){
-                tmpPriceDao.delprice(payOrder.getType()+"-"+payOrder.getReallyPrice());
+            if (payOrderDao.setState(1,payOrder.getId()) != 1) {
+                return ResUtil.error("补单成功，但订单状态保存失败，请重试");
             }
-            payOrderDao.setState(1,payOrder.getId());
             return ResUtil.success();
         }else{
             return ResUtil.error(-2,res);
         }
 
+    }
+
+    protected String sendCallback(String url, String parameters) {
+        return HttpRequest.sendGet(url, parameters);
     }
 
     public CommonRes addPayQrcode(PayQrcode payQrcode){
