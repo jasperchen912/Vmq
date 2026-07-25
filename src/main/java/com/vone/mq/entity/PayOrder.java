@@ -5,11 +5,18 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 
 @Entity
 public class PayOrder {
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @SequenceGenerator(
+            name = "pay_order_sequence",
+            sequenceName = "PAY_ORDER_SEQ",
+            allocationSize = 50)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "pay_order_sequence")
     private Long id;
 
     //支付云端唯一订单号

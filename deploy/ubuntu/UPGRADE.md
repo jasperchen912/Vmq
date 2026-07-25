@@ -60,7 +60,11 @@ After the application is healthy, verify login, dashboard totals, QR-code
 upload, order creation/query, and one callback flow before changing the live
 gateway configuration.
 
-During the first modernized startup, the schema runner aligns Hibernate 6's
-`PAY_ORDER_SEQ` and `PAY_QRCODE_SEQ` above the highest migrated IDs. A
-successful post-upgrade order insert is therefore a mandatory acceptance
-check, not just a health-check response.
+Before the web server starts accepting traffic, the schema initializer aligns
+Hibernate 6's pooled `PAY_ORDER_SEQ` and `PAY_QRCODE_SEQ` so the first generated
+ID is exactly one greater than the highest stored ID. The physical sequences
+use an increment of 50, so their next high value is `MAX(id) + 50`; restarting
+them at only `MAX(id) + 1` makes Hibernate allocate IDs below the migrated
+range. A successful post-upgrade order insert and a second insert after a
+restart are therefore mandatory acceptance checks, not just health-check
+responses.

@@ -18,10 +18,10 @@ public final class HttpRequest {
     private static final Logger LOGGER = LoggerFactory.getLogger(HttpRequest.class);
     private static final String NO_RESPONSE = "服务器无响应";
     private static final Duration REQUEST_TIMEOUT =
-            Duration.ofSeconds(readTimeout("vmq.http.request-timeout-seconds", 8L));
+            Duration.ofSeconds(readTimeout("vmq.http.request-timeout-seconds", 30L));
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(
-                    readTimeout("vmq.http.connect-timeout-seconds", 3L)))
+                    readTimeout("vmq.http.connect-timeout-seconds", 5L)))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 

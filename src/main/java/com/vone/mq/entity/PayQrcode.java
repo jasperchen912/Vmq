@@ -4,11 +4,18 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 
 @Entity
 public class PayQrcode {
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @SequenceGenerator(
+            name = "pay_qrcode_sequence",
+            sequenceName = "PAY_QRCODE_SEQ",
+            allocationSize = 50)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "pay_qrcode_sequence")
     private Long id;
 
     private String payUrl;

@@ -1,16 +1,20 @@
 package com.vone.mq.utils;
 
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-public class PayOrderSchemaMigration implements ApplicationRunner {
+public class PayOrderSchemaMigration implements SmartInitializingSingleton {
 
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(PayOrderSchemaMigration.class);
     static final int CALLBACK_URL_LENGTH = 2048;
+    static final int ENTITY_SEQUENCE_ALLOCATION_SIZE = 50;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -19,7 +23,11 @@ public class PayOrderSchemaMigration implements ApplicationRunner {
     }
 
     @Override
-    public void run(ApplicationArguments args) {
+    public void afterSingletonsInstantiated() {
+        migrate();
+    }
+
+    public void migrate() {
         widenColumnIfNeeded("NOTIFY_URL");
         widenColumnIfNeeded("RETURN_URL");
         alignEntitySequences();
@@ -86,22 +94,37 @@ public class PayOrderSchemaMigration implements ApplicationRunner {
     }
 
     private void alignSequenceAboveExistingIds(String tableName, String sequenceName) {
-        Long nextValue = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(MAX(id), 0) + 1 FROM " + tableName,
+        Long highestId = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) FROM " + tableName,
                 Long.class);
-        long restartWith = nextValue == null ? 1L : Math.max(1L, nextValue);
+        long normalizedHighestId = Math.max(
+                0L,
+                highestId == null ? 0L : highestId);
+        long restartWith = Math.max(
+                ENTITY_SEQUENCE_ALLOCATION_SIZE,
+                normalizedHighestId
+                        + ENTITY_SEQUENCE_ALLOCATION_SIZE);
 
         jdbcTemplate.execute(
                 "CREATE SEQUENCE IF NOT EXISTS "
                         + sequenceName
                         + " START WITH "
                         + restartWith
-                        + " INCREMENT BY 50");
+                        + " INCREMENT BY "
+                        + ENTITY_SEQUENCE_ALLOCATION_SIZE);
         jdbcTemplate.execute(
                 "ALTER SEQUENCE "
                         + sequenceName
                         + " RESTART WITH "
-                        + restartWith);
+                        + restartWith
+                        + " INCREMENT BY "
+                        + ENTITY_SEQUENCE_ALLOCATION_SIZE);
+        LOGGER.info(
+                "Aligned {} above {}.id={}; next generated ID will be {}",
+                sequenceName,
+                tableName,
+                normalizedHighestId,
+                normalizedHighestId + 1);
     }
 
     private boolean tableExists(String tableName) {

@@ -7,7 +7,7 @@ services:
     ports:
       - "127.0.0.1:18082:8080"
     environment:
-      JAVA_OPTS: "-Xms128m -Xmx448m -XX:+ExitOnOutOfMemoryError"
+      JAVA_OPTS: "-Xms128m -Xmx448m -XX:+ExitOnOutOfMemoryError -Dvmq.http.connect-timeout-seconds=5 -Dvmq.http.request-timeout-seconds=30"
       VMQ_DATASOURCE_URL: "jdbc:h2:/data/mq"
       VMQ_SESSION_STORE_DIR: "/data/sessions"
       VMQ_SESSION_TIMEOUT: "8h"

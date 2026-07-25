@@ -129,7 +129,10 @@ public class AdminService {
 
     public PageRes getOrders(Integer page, Integer limit, Integer type, Integer state){
 
-        Pageable pageable = PageRequest.of(page-1, limit, Sort.Direction.DESC, "id");
+        Sort order = Sort.by(
+                Sort.Order.desc("createDate"),
+                Sort.Order.desc("id"));
+        Pageable pageable = PageRequest.of(page - 1, limit, order);
 
         Specification<PayOrder> specification = new Specification<PayOrder>() {
             @Override

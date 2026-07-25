@@ -6,6 +6,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.SequenceGenerator;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -30,8 +33,8 @@ public class PayOrderSchemaUpdateTest {
         PayOrderSchemaMigration migration =
                 new PayOrderSchemaMigration(new JdbcTemplate(dataSource));
 
-        migration.run(null);
-        migration.run(null);
+        migration.migrate();
+        migration.migrate();
 
         assertColumnLength(databaseUrl, "NOTIFY_URL", CALLBACK_URL_LENGTH);
         assertColumnLength(databaseUrl, "RETURN_URL", CALLBACK_URL_LENGTH);
@@ -54,6 +57,20 @@ public class PayOrderSchemaUpdateTest {
     }
 
     @Test
+    public void entitiesUseExplicitPooledSequences() throws Exception {
+        assertSequenceMapping(
+                PayOrder.class,
+                "id",
+                "pay_order_sequence",
+                "PAY_ORDER_SEQ");
+        assertSequenceMapping(
+                PayQrcode.class,
+                "id",
+                "pay_qrcode_sequence",
+                "PAY_QRCODE_SEQ");
+    }
+
+    @Test
     public void schemaUpdateAlignsHibernateSixSequencesAboveExistingIds() throws Exception {
         String databaseUrl = "jdbc:h2:mem:pay-order-sequence-update;DB_CLOSE_DELAY=-1";
         createLegacySchema(databaseUrl);
@@ -65,10 +82,10 @@ public class PayOrderSchemaUpdateTest {
         PayOrderSchemaMigration migration =
                 new PayOrderSchemaMigration(new JdbcTemplate(dataSource));
 
-        migration.run(null);
+        migration.migrate();
 
-        assertNextSequenceValue(databaseUrl, "PAY_ORDER_SEQ", 43L);
-        assertNextSequenceValue(databaseUrl, "PAY_QRCODE_SEQ", 18L);
+        assertSequence(databaseUrl, "PAY_ORDER_SEQ", 92L, 50L);
+        assertSequence(databaseUrl, "PAY_QRCODE_SEQ", 67L, 50L);
     }
 
     private void createLegacySchema(String databaseUrl) throws Exception {
@@ -141,15 +158,44 @@ public class PayOrderSchemaUpdateTest {
         }
     }
 
-    private void assertNextSequenceValue(
-            String databaseUrl, String sequenceName, long expectedValue) throws Exception {
+    private void assertSequence(
+            String databaseUrl,
+            String sequenceName,
+            long expectedValue,
+            long expectedIncrement) throws Exception {
         try (Connection connection = DriverManager.getConnection(databaseUrl, "sa", "");
-             Statement statement = connection.createStatement();
-             ResultSet result = statement.executeQuery(
-                     "SELECT NEXT VALUE FOR " + sequenceName)) {
-            result.next();
-            assertEquals(expectedValue, result.getLong(1));
+             Statement statement = connection.createStatement()) {
+            try (ResultSet result = statement.executeQuery(
+                    "SELECT NEXT VALUE FOR " + sequenceName)) {
+                result.next();
+                assertEquals(expectedValue, result.getLong(1));
+            }
+            try (ResultSet result = statement.executeQuery(
+                    "SELECT INCREMENT FROM INFORMATION_SCHEMA.SEQUENCES "
+                            + "WHERE SEQUENCE_NAME = '" + sequenceName + "'")) {
+                result.next();
+                assertEquals(expectedIncrement, result.getLong(1));
+            }
         }
+    }
+
+    private void assertSequenceMapping(
+            Class<?> entityType,
+            String fieldName,
+            String generatorName,
+            String sequenceName) throws Exception {
+        GeneratedValue generatedValue = entityType
+                .getDeclaredField(fieldName)
+                .getAnnotation(GeneratedValue.class);
+        SequenceGenerator sequenceGenerator = entityType
+                .getDeclaredField(fieldName)
+                .getAnnotation(SequenceGenerator.class);
+
+        assertEquals(GenerationType.SEQUENCE, generatedValue.strategy());
+        assertEquals(generatorName, generatedValue.generator());
+        assertEquals(generatorName, sequenceGenerator.name());
+        assertEquals(sequenceName, sequenceGenerator.sequenceName());
+        assertEquals(50, sequenceGenerator.allocationSize());
     }
 
     private String repeat(String value, int count) {
